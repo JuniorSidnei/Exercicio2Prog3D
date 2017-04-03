@@ -5,116 +5,157 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Created by Sidnei on 02/04/2017.
+ * Created by Vinicius on 02/04/2017.
  */
-
 public class Pixelate
 {
-    private static String Path = "C:\\Users\\Sidnei\\Documents\\Prog3d\\img\\img\\cor";
 
-
-    private float [][] contraste =
-        {
-                { 0.0f, -1.0f,  0.0f},
-                {-1.0f,  5.0f, -1.0f},
-                { 0.0f, -1.0f,  0.0f}
-        };
-
-    private int saturate(int value)
+    static float contraste[][] =
     {
+            { 0, -1,  0},
+            {-1,  5, -1},
+            { 0, -1,  0}
+    };
 
-        if(value > 255)
-
+    public static int saturação(int value)
+    {
+        if (value > 255)
             return 255;
-
-        if(value < 0)
-
+        else if (value < 0)
             return 0;
-
         return value;
+    }
+
+    static Color applyKernel(Color[][] colors, float[][] kernel)
+    {
+        Color newColors[][] = new Color[3][3];
+        for (int x = 0; x < 3; x++)
+        {
+            for (int y = 0; y < 3; y++)
+            {
+                int red = saturação((int) (colors[x][y].getRed() * kernel[x][y]));
+                int green = saturação((int) (colors[x][y].getGreen() * kernel[x][y]));
+                int blue = saturação((int) (colors[x][y].getBlue() * kernel[x][y]));
+                newColors[x][y] = new Color(red, green, blue);
+            }
+        }
+        int sr = 0;
+        int sg = 0;
+        int sb = 0;
+        
+        for (int x = 0; x < 3; x++)
+        {
+            for (int y = 0; y < 3; y++)
+            {
+                sr +=  newColors[x][y].getRed();
+                sg +=  newColors[x][y].getGreen();
+                sb +=  newColors[x][y].getBlue();
+            }
+        }
+        return new Color(sr, sg, sb);
+    }
+
+     public static void nextColor(BufferedImage img,BufferedImage out, int x, int y, int pixelSize)
+    {
+        Color newColor = new Color(img.getRGB(x,y));
+
+        for (int height = y; height < y + pixelSize; height++)
+        {
+            for (int width = x; width < x + pixelSize; width++)
+            {
+
+                if(height >= img.getHeight() || width >= img.getWidth())
+                {
+                    continue;
+                }
+                out.setRGB(width, height, newColor.getRGB());
+            }
+        }
+    }
+     public static void setContraste(BufferedImage img, BufferedImage out, int x, int y, int pixelSize, Color cor)
+    {
+        for (int height = y; height < y + pixelSize ; height++)
+        {
+            for (int width = x; width < x + pixelSize ; width++)
+            {
+                if(height >= img.getHeight() || width >= img.getWidth())
+                {
+                    continue;
+                }
+                out.setRGB(width, height, cor.getRGB());
+            }
+        }
+    }
+    
+
+    static Color[][] getPixelColor(BufferedImage img, int x, int y)
+    {
+        return new Color[][]{
+                {getColor(img,x-1, y-1), getColor(img, x, y-1), getColor(img, x+1, y-1)},
+                {getColor(img,x-1, y+0), getColor(img, x, y+0), getColor(img, x+1, y+0)},
+                {getColor(img,x-1, y+1), getColor(img, x, y+1), getColor(img, x+1, y+1)}
+        };
 
     }
 
-
-
-    private BufferedImage applyKernel(BufferedImage img, float[][] kernel)
+    static BufferedImage convolve(BufferedImage img, float[][] kernel, int pixelSize)
     {
-
         BufferedImage out = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
 
-
-        for (int y = 0; y < img.getHeight(); y++)
+        for (int y = 0; y < img.getHeight(); y+=pixelSize)
         {
-
-            for (int x = 0; x < img.getWidth(); x++)
+            for (int x = 0; x < img.getWidth() ; x+=pixelSize)
             {
-
-                int r = 0;
-
-                int g = 0;
-
-                int b = 0;
-
-
-
-                for(int kx=0; kx < 3; kx++){
-
-                    for(int ky = 0; ky < 3; ky++) {
-
-
-
-                        int px = x + (kx - 1);
-
-                        int py = y + (ky - 1);
-
-
-
-                        if(px < 0 || px >= img.getWidth() || py < 0 || py >= img.getHeight())
-
-                            continue;
-
-
-
-                        Color color = new Color(img.getRGB(px, py));
-
-                        r += color.getRed() * kernel[kx][ky];
-
-                        g += color.getGreen() * kernel[kx][ky];
-
-                        b += color.getBlue() * kernel[kx][ky];
-
-                    }
-
-                }
-
-                Color newColor = new Color(saturate(r), saturate(g), saturate(b));
-
-                out.setRGB(x, y, newColor.getRGB());
-
+                Color colors = new Color(applyKernel(getPixelColor(img, x, y), kernel).getRGB());
+                setContraste(img,out,x,y,pixelSize,colors);
+                out.setRGB(x, y, colors.getRGB());
             }
 
         }
-
         return out;
-
     }
 
+    static Color getColor (BufferedImage img, int x, int y)
+    {
+        if(x < 0 || x >= img.getWidth() || y < 0 || y >= img.getHeight())
+            return new Color(0,0,0);
 
+        return new Color (img.getRGB(x, y));
 
-    private void run() throws IOException
+    }
+    public static BufferedImage pixelate(BufferedImage img, int pixelSize)
     {
 
-        BufferedImage img = ImageIO.read(new File(Path, "turtle.jpg"));
-        BufferedImage newImg = applyKernel(img, contraste);
-        ImageIO.write(newImg, "jpg", new File(Path, "turtleSuavizacaoCruz.jpg"));
+        BufferedImage out = new BufferedImage(img.getWidth(), img.getHeight(),img.getType());
 
+        for (int y = 0; y < img.getHeight();  y += pixelSize)
+        {
+            for (int x = 0; x < img.getWidth(); x += pixelSize)
+            {
+                nextColor(img, out, x, y, pixelSize);
+            }
+        }
+
+        return out;
     }
 
+   
 
+   
 
-    public static void main(String[] args) throws IOException {
+    public static void run() throws IOException
+    {
+        String PATH = "C:\\Temp\\img\\cor";
+        BufferedImage img = ImageIO.read(new File(PATH,"puppy.png"));
+        BufferedImage pixelateImg = pixelate(img, 15);
+        BufferedImage pixelContraste = convolve(pixelateImg, contraste, 5);
 
+        ImageIO.write(pixelateImg, "png", new File("pixelpuppy.png"));
+        ImageIO.write(pixelContraste, "png", new File("constrastepuppy.png"));
+    }
+
+    public static void main(String[] args) throws IOException
+    {
         new Pixelate().run();
-
     }
 }
